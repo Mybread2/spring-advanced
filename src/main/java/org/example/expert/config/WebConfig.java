@@ -15,12 +15,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final AdminLoggingInterceptor adminLoggingInterceptor;
 
-    // ArgumentResolver 등록
-    @Override
-    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
-        resolvers.add(new AuthUserArgumentResolver());
-    }
-
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(adminLoggingInterceptor)
