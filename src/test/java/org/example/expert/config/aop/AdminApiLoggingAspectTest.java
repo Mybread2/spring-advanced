@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.example.expert.config.annotation.AdminAudit;
+import org.example.expert.config.security.UserPrincipal;
+import org.example.expert.domain.user.enums.UserRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +13,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -39,11 +44,21 @@ class AdminApiLoggingAspectTest {
     void aop_logging_works() throws Throwable {
         // Given
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setAttribute("userId", 1L);
         request.setMethod("DELETE");
         request.setRequestURI("/admin/comments/1");
 
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        // Spring Security Authentication 설정
+        UserPrincipal userPrincipal = UserPrincipal.builder()
+                .id(1L)
+                .email("admin@test.com")
+                .role(UserRole.ADMIN)
+                .build();
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userPrincipal, null, userPrincipal.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
         MethodSignature signature = mock(MethodSignature.class);
         Method method = this.getClass().getMethod("testMethod");
@@ -59,10 +74,15 @@ class AdminApiLoggingAspectTest {
         // Then
         assertThat(result).isNull();
         verify(joinPoint).proceed();
+
+        // Cleanup
+        SecurityContextHolder.clearContext();
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
     @AdminAudit(description = "테스트")
     public void testMethod() {
+        // 테스트용 메서드
     }
 }

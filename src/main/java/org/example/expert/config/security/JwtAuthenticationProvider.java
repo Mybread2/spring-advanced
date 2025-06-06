@@ -14,7 +14,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import javax.swing.*;
 import java.security.Key;
 import java.util.Base64;
 import java.util.Date;
@@ -24,12 +23,14 @@ import java.util.Date;
 public class JwtAuthenticationProvider {
 
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final long TOKEN_TIME = 60 * 60 * 1000L; // 60분
 
     @Value("${jwt.secret.key}")
     private String secretKey;
     private Key key;
     private final SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
+
+    @Value("${jwt.expiration.time:3600000}")  // 기본값 3600000 (1시간)
+    private long tokenExpirationTime;
 
     @PostConstruct
     public void init() {
@@ -46,7 +47,7 @@ public class JwtAuthenticationProvider {
                         .setSubject(String.valueOf(userId))
                         .claim("email", email)
                         .claim("userRole", userRole.name())
-                        .setExpiration(new Date(date.getTime() + TOKEN_TIME))
+                        .setExpiration(new Date(date.getTime() + tokenExpirationTime))
                         .setIssuedAt(date)
                         .signWith(key, signatureAlgorithm)
                         .compact();
