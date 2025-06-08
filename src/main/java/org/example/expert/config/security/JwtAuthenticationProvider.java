@@ -5,6 +5,7 @@ import io.jsonwebtoken.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.expert.domain.auth.service.TokenBlacklistService;
 import org.example.expert.domain.user.enums.UserRole;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
@@ -20,6 +21,7 @@ public class JwtAuthenticationProvider {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtProperties jwtProperties;
+    private final TokenBlacklistService tokenBlacklistService;
 
     // 요청에서 JWT 토큰을 추출하여 Authentication 객체 생성
     public Authentication getAuthentication(HttpServletRequest request) {
@@ -37,6 +39,12 @@ public class JwtAuthenticationProvider {
         try {
             // JwtTokenProvider 에게 토큰 파싱 위임
             Claims claims = jwtTokenProvider.parseToken(token);
+
+            // 블랙리스트 검증 추가
+            String jti = claims.getId();
+            if (StringUtils.hasText(jti) && tokenBlacklistService.isBlacklisted(jti)) {
+                throw new BadCredentialsException("로그아웃된 토큰입니다.");
+            }
 
             // 사용자 정보 추출
             String userIdStr = claims.getSubject();
@@ -85,7 +93,7 @@ public class JwtAuthenticationProvider {
     }
 
     // 요청 헤더에서 JWT 토큰 추출
-    private String extractTokenFromRequest(HttpServletRequest request) {
+    public String extractTokenFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
 
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(jwtProperties.getBearerPrefix())) {

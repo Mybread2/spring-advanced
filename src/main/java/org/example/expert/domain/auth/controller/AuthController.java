@@ -1,7 +1,9 @@
 package org.example.expert.domain.auth.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.expert.config.security.JwtAuthenticationProvider;
 import org.example.expert.config.security.UserPrincipal;
 import org.example.expert.domain.auth.dto.request.RefreshTokenRequest;
 import org.example.expert.domain.auth.dto.request.SigninRequest;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtAuthenticationProvider jwtAuthenticationProvider;
 
     @PostMapping("/auth/signup")
     public SignupResponse signup(@Valid @RequestBody SignupRequest signupRequest) {
@@ -37,8 +40,10 @@ public class AuthController {
     }
 
     @PostMapping("/auth/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal userPrincipal) {
-        authService.logout(userPrincipal.getId());
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal userPrincipal,
+                                       HttpServletRequest request) {
+        String accessToken = jwtAuthenticationProvider.extractTokenFromRequest(request);
+        authService.logout(userPrincipal.getId(), accessToken);
         return ResponseEntity.ok().build();
     }
 }

@@ -1,5 +1,6 @@
 package org.example.expert.domain.auth.service;
 
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.example.expert.config.security.JwtTokenProvider;
 import org.example.expert.domain.auth.dto.request.SigninRequest;
@@ -15,6 +16,9 @@ import org.example.expert.domain.user.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Transactional
     public SignupResponse signup(SignupRequest signupRequest) {
@@ -59,10 +64,10 @@ public class AuthService {
             throw new AuthException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        String bearerToken = jwtTokenProvider.createToken(user.getId(), user.getEmail(), user.getUserRole());
+        String accessToken= jwtTokenProvider.createToken(user.getId(), user.getEmail(), user.getUserRole());
         String refreshToken = refreshTokenService.createRefreshToken(user.getId());
 
-        return new SigninResponse(bearerToken, refreshToken);
+        return new SigninResponse(accessToken, refreshToken);
     }
 
     @Transactional
@@ -91,5 +96,32 @@ public class AuthService {
     public void logout(Long userId) {
         // 사용자의 모든 RefreshToken 삭제
         refreshTokenService.deleteRefreshTokenByUserId(userId);
+    }
+
+    @Transactional
+    public void logout(Long userId, String accessToken) {
+        try {
+            // 1. Access Token 블랙리스트 추가
+            if (StringUtils.hasText(accessToken)) {
+                Claims claims = jwtTokenProvider.parseToken(accessToken);
+                String jti = claims.getId();
+
+                if (StringUtils.hasText(jti)) {
+                    LocalDateTime expiresAt = jwtTokenProvider.getExpirationTime(claims);
+
+                    // 아직 만료되지 않은 토큰만 블랙리스트에 추가
+                    if (expiresAt.isAfter(LocalDateTime.now())) {
+                        tokenBlacklistService.addToBlacklist(jti, userId, expiresAt);
+                    }
+                }
+            }
+
+            // 2. Refresh Token 삭제
+            refreshTokenService.deleteRefreshTokenByUserId(userId);
+
+        } catch (Exception e) {
+            refreshTokenService.deleteRefreshTokenByUserId(userId);
+            throw new RuntimeException("로그아웃 처리 중 오류가 발생했습니다.", e);
+        }
     }
 }
