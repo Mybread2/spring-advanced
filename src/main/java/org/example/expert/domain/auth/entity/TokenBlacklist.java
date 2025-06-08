@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 public class TokenBlacklist {
 
     @Id
-    @Column(length = 36) // UUID 길이
+    @Column(length = 36)
     private String jti;
 
     @Column(name = "user_id", nullable = false)
@@ -35,10 +35,5 @@ public class TokenBlacklist {
         this.jti = jti;
         this.userId = userId;
         this.expiresAt = expiresAt;
-    }
-
-    // 토큰이 만료되었는지 확ㅇ니
-    public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
     }
 }

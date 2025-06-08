@@ -2,12 +2,14 @@ package org.example.expert.domain.common.exception;
 
 import org.example.expert.domain.auth.exception.AuthException;
 import org.example.expert.domain.auth.exception.RateLimitException;
+import org.example.expert.domain.common.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,45 +17,54 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<Map<String, Object>> invalidRequestExceptionException(InvalidRequestException ex) {
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-        return getErrorResponse("E1001", ex.getMessage(), status);
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRequest(InvalidRequestException ex) {
+        ApiResponse<Void> response = ApiResponse.failure(ex.getMessage(), "E1001");
+        return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(AuthException.class)
-    public ResponseEntity<Map<String, Object>> handleAuthException(AuthException ex) {
-        HttpStatus status = HttpStatus.UNAUTHORIZED;
-        return getErrorResponse("E2001", ex.getMessage(), status);
+    public ResponseEntity<ApiResponse<Void>> handleAuthException(AuthException ex) {
+        ApiResponse<Void> response = ApiResponse.failure(ex.getMessage(), "E2001");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
     @ExceptionHandler(RateLimitException.class)
-    public ResponseEntity<Map<String, Object>> handleRateLimitException(RateLimitException ex) {
-        HttpStatus status = HttpStatus.TOO_MANY_REQUESTS;
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleRateLimitException(RateLimitException ex) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("remainingTimeMinutes", ex.getRemainingTimeMinutes());
+        data.put("retryAfter", ex.getRemainingTimeMinutes() * 60);
 
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("code", "E2006");
-        errorResponse.put("message", ex.getMessage());
-        errorResponse.put("status", status.name());
-        errorResponse.put("timestamp", LocalDateTime.now());
-        errorResponse.put("remainingTimeMinutes", ex.getRemainingTimeMinutes());
-        errorResponse.put("retryAfter", ex.getRemainingTimeMinutes() * 60);
-
-        return new ResponseEntity<>(errorResponse, status);
+        ApiResponse<Map<String, Object>> response = ApiResponse.failure(ex.getMessage(), "E2006");
+        // data 필드에 추가 정보 포함
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
     }
 
     @ExceptionHandler(ServerException.class)
-    public ResponseEntity<Map<String, Object>> handleServerException(ServerException ex) {
-        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
-        return getErrorResponse("E5000", ex.getMessage(), status);
+    public ResponseEntity<ApiResponse<Void>> handleServerException(ServerException ex) {
+        ApiResponse<Void> response = ApiResponse.failure(ex.getMessage(), "E5000");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
-    public ResponseEntity<Map<String, Object>> getErrorResponse(String code, String message, HttpStatus status) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("code", code);
-        errorResponse.put("message", message);
-        errorResponse.put("status", status.name());
-        errorResponse.put("timestamp", LocalDateTime.now());
+    // Validation 에러 처리
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(
+            MethodArgumentNotValidException ex) {
 
-        return new ResponseEntity<>(errorResponse, status);
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
+        ApiResponse<Map<String, String>> response = ApiResponse.failure("입력값이 올바르지 않습니다.", "E1002");
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    // 기타 예외 처리
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGenericException() {
+        ApiResponse<Void> response = ApiResponse.failure("서버 내부 오류가 발생했습니다.", "E5000");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

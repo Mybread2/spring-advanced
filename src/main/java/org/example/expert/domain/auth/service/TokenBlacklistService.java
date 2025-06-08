@@ -36,7 +36,7 @@ public class TokenBlacklistService {
     }
 
     // 만료된 토큰들을 정리 (스케줄러)
-    @Scheduled(fixedRate = 300000) // 5분마다
+    @Scheduled(fixedRate = 300000)
     @Transactional
     public void cleanupExpiredTokens() {
         try {

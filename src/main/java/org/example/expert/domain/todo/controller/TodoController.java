@@ -3,6 +3,8 @@ package org.example.expert.domain.todo.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.expert.config.security.UserPrincipal;
+import org.example.expert.domain.common.dto.ApiResponse;
+import org.example.expert.domain.common.dto.PageResponse;
 import org.example.expert.domain.todo.dto.request.TodoSaveRequest;
 import org.example.expert.domain.todo.dto.response.TodoResponse;
 import org.example.expert.domain.todo.dto.response.TodoSaveResponse;
@@ -19,23 +21,27 @@ public class TodoController {
     private final TodoService todoService;
 
     @PostMapping("/todos")
-    public ResponseEntity<TodoSaveResponse> saveTodo(
+    public ResponseEntity<ApiResponse<TodoSaveResponse>> saveTodo(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @RequestBody TodoSaveRequest todoSaveRequest
     ) {
-        return ResponseEntity.ok(todoService.saveTodo(userPrincipal.getId(), todoSaveRequest));
+        TodoSaveResponse response = todoService.saveTodo(userPrincipal.getId(), todoSaveRequest);
+        return ResponseEntity.ok(ApiResponse.success(response, "할일이 등록되었습니다."));
     }
 
     @GetMapping("/todos")
-    public ResponseEntity<Page<TodoResponse>> getTodos(
+    public ResponseEntity<ApiResponse<PageResponse<TodoResponse>>> getTodos(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(todoService.getTodos(page, size));
+        Page<TodoResponse> todos = todoService.getTodos(page, size);
+        PageResponse<TodoResponse> pageResponse = PageResponse.of(todos);
+        return ResponseEntity.ok(ApiResponse.success(pageResponse));
     }
 
     @GetMapping("/todos/{todoId}")
-    public ResponseEntity<TodoResponse> getTodo(@PathVariable long todoId) {
-        return ResponseEntity.ok(todoService.getTodo(todoId));
+    public ResponseEntity<ApiResponse<TodoResponse>> getTodo(@PathVariable long todoId) {
+        TodoResponse response = todoService.getTodo(todoId);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
