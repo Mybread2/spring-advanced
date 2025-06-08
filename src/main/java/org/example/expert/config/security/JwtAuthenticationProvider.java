@@ -1,12 +1,11 @@
+
 package org.example.expert.config.security;
 
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.expert.domain.user.enums.UserRole;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -14,46 +13,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.security.Key;
-import java.util.Base64;
-import java.util.Date;
-
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class JwtAuthenticationProvider {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
-    @Value("${jwt.secret.key}")
-    private String secretKey;
-    private Key key;
-    private final SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    @Value("${jwt.expiration.time:3600000}")  // 기본값 3600000 (1시간)
-    private long tokenExpirationTime;
-
-    @PostConstruct
-    public void init() {
-        byte[] bytes = Base64.getDecoder().decode(secretKey);
-        key = Keys.hmacShaKeyFor(bytes);
-    }
-
-    // 토큰 생성
-    public String createToken(Long userId, String email, UserRole userRole) {
-        Date date = new Date();
-
-        return BEARER_PREFIX +
-                Jwts.builder()
-                        .setSubject(String.valueOf(userId))
-                        .claim("email", email)
-                        .claim("userRole", userRole.name())
-                        .setExpiration(new Date(date.getTime() + tokenExpirationTime))
-                        .setIssuedAt(date)
-                        .signWith(key, signatureAlgorithm)
-                        .compact();
-    }
-
-    // 요청에서 토큰 추출 후 Authentication 객체 생성 (모든 검증 포함)
+    // 요청에서 JWT 토큰을 추출하여 Authentication 객체 생성
     public Authentication getAuthentication(HttpServletRequest request) {
         String token = extractTokenFromRequest(request);
 
@@ -64,21 +33,18 @@ public class JwtAuthenticationProvider {
         return createAuthentication(token);
     }
 
-    // 토큰으로부터 Authentication 객체 생성 (검증 + 파싱 통합)
+    // JWT 토큰으로부터 Authentication 객체 생성
     private Authentication createAuthentication(String token) {
         try {
-            // 토큰 파싱 및 검증
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(key)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+            // JwtTokenProvider 에게 토큰 파싱 위임
+            Claims claims = jwtTokenProvider.parseToken(token);
 
             // 사용자 정보 추출
             String userIdStr = claims.getSubject();
             String email = claims.get("email", String.class);
             String roleStr = claims.get("userRole", String.class);
 
+            // 필수 정보 검증
             if (!StringUtils.hasText(userIdStr) || !StringUtils.hasText(email) || !StringUtils.hasText(roleStr)) {
                 throw new BadCredentialsException("JWT 토큰에 필수 정보가 누락되었습니다.");
             }
