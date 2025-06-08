@@ -12,8 +12,9 @@ public class JwtProperties {
     // JWT 서명에 사용할 비밀키 (Base64 인코딩)
     private String secretKey;
 
-    // Access Token 만료 시간 (밀리초)
-    private Long expirationTime = 3_600_000L;
+    // Access Token 만료 시간 (기본 15분)
+    // 보안을 위해 짧게 설정, 추후 Refresh Token 으로 갱신 예정
+    private Long expirationTime = 900_000L;
 
     // JWT 발급자 정보
     private String issuer = "expert-app";

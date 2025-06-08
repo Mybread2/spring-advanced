@@ -30,7 +30,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // JWT 토큰 추출 + 검증 + Authentication 생성을 한 번에
             Authentication authentication = jwtAuthenticationProvider.getAuthentication(request);
             SecurityContextHolder.getContext().setAuthentication(authentication);
-
             log.debug("JWT 인증 성공: {}", authentication.getName());
 
         } catch (AuthenticationException e) {

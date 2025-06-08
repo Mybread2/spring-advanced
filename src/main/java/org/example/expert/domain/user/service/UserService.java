@@ -1,6 +1,7 @@
 package org.example.expert.domain.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.expert.domain.auth.service.RefreshTokenService;
 import org.example.expert.domain.common.exception.InvalidRequestException;
 import org.example.expert.domain.user.dto.request.UserChangePasswordRequest;
 import org.example.expert.domain.user.dto.response.UserResponse;
@@ -16,6 +17,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional(readOnly = true)
     public UserResponse getUser(long userId) {
@@ -29,14 +31,18 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidRequestException("User not found"));
 
-        if (passwordEncoder.matches(userChangePasswordRequest.getNewPassword(), user.getPassword())) {
-            throw new InvalidRequestException("새 비밀번호는 기존 비밀번호와 같을 수 없습니다.");
-        }
-
+        // 1. 먼저 기존 비밀번호 검증 (보안상 중요!)
         if (!passwordEncoder.matches(userChangePasswordRequest.getOldPassword(), user.getPassword())) {
             throw new InvalidRequestException("잘못된 비밀번호입니다.");
         }
 
+        // 2. 그 다음에 새 비밀번호와 기존 비밀번호 비교
+        if (passwordEncoder.matches(userChangePasswordRequest.getNewPassword(), user.getPassword())) {
+            throw new InvalidRequestException("새 비밀번호는 기존 비밀번호와 같을 수 없습니다.");
+        }
+
         user.changePassword(passwordEncoder.encode(userChangePasswordRequest.getNewPassword()));
+
+        refreshTokenService.deleteRefreshTokenByUserId(userId);
     }
 }

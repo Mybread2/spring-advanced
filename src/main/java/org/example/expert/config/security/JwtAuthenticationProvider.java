@@ -64,10 +64,16 @@ public class JwtAuthenticationProvider {
 
         } catch (ExpiredJwtException e) {
             log.debug("만료된 JWT 토큰: {}", e.getMessage());
-            throw new CredentialsExpiredException("JWT 토큰이 만료되었습니다.");
-        } catch (SignatureException | MalformedJwtException | UnsupportedJwtException e) {
-            log.debug("유효하지 않은 JWT 토큰: {}", e.getMessage());
-            throw new BadCredentialsException("유효하지 않은 JWT 토큰입니다.");
+            throw new CredentialsExpiredException("JWT 토큰이 만료되었습니다. 다시 로그인해주세요.");
+        } catch (SignatureException e) {
+            log.debug("JWT 서명 검증 실패: {}", e.getMessage());
+            throw new BadCredentialsException("JWT 토큰 서명이 유효하지 않습니다.");
+        } catch (MalformedJwtException e) {
+            log.debug("잘못된 JWT 형식: {}", e.getMessage());
+            throw new BadCredentialsException("JWT 토큰 형식이 올바르지 않습니다.");
+        } catch (UnsupportedJwtException e) {
+            log.debug("지원하지 않는 JWT: {}", e.getMessage());
+            throw new BadCredentialsException("지원하지 않는 JWT 토큰입니다.");
         } catch (NumberFormatException e) {
             throw new BadCredentialsException("JWT 토큰의 사용자 ID가 올바르지 않습니다.");
         } catch (IllegalArgumentException e) {
