@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Date;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -33,8 +34,10 @@ public class JwtTokenProvider {
     // JWT 토큰 생성 (Bearer 접두사 포함)
     public String createToken(Long userId, String email, UserRole userRole) {
         Date date = new Date();
+        String jti = UUID.randomUUID().toString();
 
         return Jwts.builder()
+                .setId(jti)
                 .setSubject(String.valueOf(userId))
                 .claim("email", email)
                 .claim("userRole", userRole.name())

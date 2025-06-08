@@ -2,6 +2,7 @@ package org.example.expert.domain.auth.service;
 
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.expert.config.security.JwtTokenProvider;
 import org.example.expert.domain.auth.dto.request.SigninRequest;
 import org.example.expert.domain.auth.dto.request.SignupRequest;
@@ -20,6 +21,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -101,27 +103,42 @@ public class AuthService {
     @Transactional
     public void logout(Long userId, String accessToken) {
         try {
-            // 1. Access Token 블랙리스트 추가
+            // 1. Access Token 블랙리스트 추가 (토큰이 있는 경우만)
             if (StringUtils.hasText(accessToken)) {
-                Claims claims = jwtTokenProvider.parseToken(accessToken);
-                String jti = claims.getId();
-
-                if (StringUtils.hasText(jti)) {
-                    LocalDateTime expiresAt = jwtTokenProvider.getExpirationTime(claims);
-
-                    // 아직 만료되지 않은 토큰만 블랙리스트에 추가
-                    if (expiresAt.isAfter(LocalDateTime.now())) {
-                        tokenBlacklistService.addToBlacklist(jti, userId, expiresAt);
-                    }
-                }
+                addAccessTokenToBlacklist(accessToken, userId);
             }
 
-            // 2. Refresh Token 삭제
+            // 2. Refresh Token 삭제 (항상 실행)
             refreshTokenService.deleteRefreshTokenByUserId(userId);
 
         } catch (Exception e) {
+            log.error("로그아웃 처리 중 오류 발생: userId={}", userId, e);
+
+            // 실패해도 RefreshToken은 삭제 (보안상 중요)
             refreshTokenService.deleteRefreshTokenByUserId(userId);
+
             throw new RuntimeException("로그아웃 처리 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    // Access Token을 블랙리스트에 추가하는 내부 메서드
+    private void addAccessTokenToBlacklist(String accessToken, Long userId) {
+        try {
+            Claims claims = jwtTokenProvider.parseToken(accessToken);
+            String jti = claims.getId();
+
+            if (StringUtils.hasText(jti)) {
+                LocalDateTime expiresAt = jwtTokenProvider.getExpirationTime(claims);
+
+                // 아직 만료되지 않은 토큰만 블랙리스트에 추가
+                if (expiresAt.isAfter(LocalDateTime.now())) {
+                    tokenBlacklistService.addToBlacklist(jti, userId, expiresAt);
+                }
+            }
+
+        } catch (Exception e) {
+            // 블랙리스트 추가 실패해도 로그아웃은 계속 진행
+            log.warn("Access Token 블랙리스트 추가 실패: userId={}", userId);
         }
     }
 }
