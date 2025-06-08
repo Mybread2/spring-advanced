@@ -18,9 +18,8 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class JwtAuthenticationProvider {
 
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private final JwtTokenProvider jwtTokenProvider;
+    private final JwtProperties jwtProperties;
 
     // 요청에서 JWT 토큰을 추출하여 Authentication 객체 생성
     public Authentication getAuthentication(HttpServletRequest request) {
@@ -83,7 +82,7 @@ public class JwtAuthenticationProvider {
     private String extractTokenFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
 
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(jwtProperties.getBearerPrefix())) {
             String token = bearerToken.substring(7);
             return StringUtils.hasText(token) ? token : null;
         }
