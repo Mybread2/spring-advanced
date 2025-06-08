@@ -10,6 +10,7 @@ import org.example.expert.domain.auth.dto.response.SigninResponse;
 import org.example.expert.domain.auth.dto.response.SignupResponse;
 import org.example.expert.domain.auth.entity.RefreshToken;
 import org.example.expert.domain.auth.exception.AuthException;
+import org.example.expert.domain.auth.exception.RateLimitException;
 import org.example.expert.domain.common.exception.InvalidRequestException;
 import org.example.expert.domain.user.entity.User;
 import org.example.expert.domain.user.enums.UserRole;
@@ -31,6 +32,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final LoginAttemptService loginAttemptService;
 
     @Transactional
     public SignupResponse signup(SignupRequest signupRequest) {
@@ -58,16 +60,33 @@ public class AuthService {
 
     @Transactional
     public SigninResponse signin(SigninRequest signinRequest) {
+        String email = signinRequest.getEmail();
 
-        User user = userRepository.findByEmail(signinRequest.getEmail())
-                .orElseThrow(() -> new AuthException("이메일 또는 비밀번호가 올바르지 않습니다."));
+        // 1. 로그인 차단 확인 ← 추가
+        if (loginAttemptService.isBlocked(email)) {
+            long remainingMinutes = loginAttemptService.getRemainingBlockTimeMinutes(email);
+            throw new RateLimitException("로그인이 일시적으로 차단되었습니다.", remainingMinutes);
+        }
 
+        // 2. 사용자 조회
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    loginAttemptService.recordFailedAttempt(email); // ← 실패 기록
+                    return new AuthException("이메일 또는 비밀번호가 올바르지 않습니다.");
+                });
+
+        // 3. 비밀번호 검증
         if (!passwordEncoder.matches(signinRequest.getPassword(), user.getPassword())) {
+            loginAttemptService.recordFailedAttempt(email); // ← 실패 기록
             throw new AuthException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        String accessToken= jwtTokenProvider.createToken(user.getId(), user.getEmail(), user.getUserRole());
+        // 4. 로그인 성공 - 토큰 발급
+        String accessToken = jwtTokenProvider.createToken(user.getId(), user.getEmail(), user.getUserRole());
         String refreshToken = refreshTokenService.createRefreshToken(user.getId());
+
+        // 5. 성공 시 시도 카운터 리셋 ← 추가
+        loginAttemptService.recordSuccessfulLogin(email);
 
         return new SigninResponse(accessToken, refreshToken);
     }
@@ -92,12 +111,6 @@ public class AuthService {
         String newRefreshToken = refreshTokenService.createRefreshToken(user.getId());
 
         return new SigninResponse(newAccessToken, newRefreshToken);
-    }
-
-    @Transactional
-    public void logout(Long userId) {
-        // 사용자의 모든 RefreshToken 삭제
-        refreshTokenService.deleteRefreshTokenByUserId(userId);
     }
 
     @Transactional

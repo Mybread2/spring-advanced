@@ -44,11 +44,6 @@ public class RefreshTokenService {
     }
 
     @Transactional
-    public void deleteRefreshToken(String token) {
-        refreshTokenRepository.deleteByToken(token);
-    }
-
-    @Transactional
     public void deleteRefreshTokenByUserId(Long userId) { // ← 이 메서드 추가
         refreshTokenRepository.deleteByUserId(userId);
     }

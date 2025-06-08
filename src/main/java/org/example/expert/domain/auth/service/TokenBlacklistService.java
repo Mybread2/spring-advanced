@@ -32,7 +32,7 @@ public class TokenBlacklistService {
     // 토큰이 블랙리스트에 있는지 확인
     @Transactional(readOnly = true)
     public boolean isBlacklisted(String jti) {
-        return tokenBlacklistRepository.existsByJtiAndNotExpired(jti, LocalDateTime.now());
+        return tokenBlacklistRepository.existsByJtiAndExpiresAtAfter(jti, LocalDateTime.now());
     }
 
     // 만료된 토큰들을 정리 (스케줄러)
