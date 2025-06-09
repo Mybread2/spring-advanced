@@ -10,10 +10,9 @@ import java.time.LocalDateTime;
 
 public interface TokenBlacklistRepository extends JpaRepository<TokenBlacklist, String> {
 
-    // JTI 로 블랙리스트된 토큰 존재 여부 확인 (만료되지 않은 것만)
+    // 기존 메서드들...
     boolean existsByJtiAndExpiresAtAfter(String jti, LocalDateTime now);
 
-    // 만료된 토큰 삭제
     @Modifying
     @Query("DELETE FROM TokenBlacklist t WHERE t.expiresAt < :expiredTime")
     void deleteExpiredTokens(@Param("expiredTime") LocalDateTime expiredTime);

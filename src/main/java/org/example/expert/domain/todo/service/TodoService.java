@@ -11,6 +11,8 @@ import org.example.expert.domain.todo.repository.TodoRepository;
 import org.example.expert.domain.user.dto.response.UserResponse;
 import org.example.expert.domain.user.entity.User;
 import org.example.expert.domain.user.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +28,7 @@ public class TodoService {
     private final WeatherClient weatherClient;
     private final UserRepository userRepository;
 
+    @CacheEvict(value = "todoLists", allEntries = true) // 새로운 할일 생성 시 목록 캐시 무효화
     @Transactional
     public TodoSaveResponse saveTodo(Long userId, TodoSaveRequest todoSaveRequest) {
 
@@ -51,6 +54,7 @@ public class TodoService {
         );
     }
 
+    @Cacheable(value = "todoLists", key = "'page_' + #page + '_size_' + #size")
     public Page<TodoResponse> getTodos(int page, int size) {
         Pageable pageable = PageRequest.of(page - 1, size);
 
@@ -67,6 +71,7 @@ public class TodoService {
         ));
     }
 
+    @Cacheable(value = "todoDetails", key = "#todoId")
     public TodoResponse getTodo(long todoId) {
         Todo todo = todoRepository.findTodoById(todoId)
                 .orElseThrow(() -> new InvalidRequestException("Todo not found"));

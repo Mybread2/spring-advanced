@@ -2,65 +2,75 @@ package org.example.expert.domain.auth.service;
 
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.example.expert.config.security.JwtTokenProvider;
 import org.example.expert.domain.auth.entity.TokenBlacklist;
 import org.example.expert.domain.auth.repository.TokenBlacklistRepository;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TokenBlacklistService {
 
     private final TokenBlacklistRepository tokenBlacklistRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    // Access Token을 블랙리스트에 추가
+    private static final String BLACKLIST_KEY_PREFIX = "blacklist:";
+
     @Transactional
     public void addTokenToBlacklist(String accessToken, Long userId) {
-        try {
-            Claims claims = jwtTokenProvider.parseToken(accessToken);
-            String jti = claims.getId();
+        Claims claims = jwtTokenProvider.parseToken(accessToken);
+        String jti = claims.getId();
 
-            if (StringUtils.hasText(jti)) {
-                LocalDateTime expiresAt = jwtTokenProvider.getExpirationTime(claims);
+        if (StringUtils.hasText(jti)) {
+            LocalDateTime expiresAt = jwtTokenProvider.getExpirationTime(claims);
 
-                // 아직 만료되지 않은 토큰만 블랙리스트에 추가
-                if (expiresAt.isAfter(LocalDateTime.now())) {
-                    // 이미 존재하면 무시 (중복 방지)
-                    if (!tokenBlacklistRepository.existsById(jti)) {
-                        TokenBlacklist blacklistToken = new TokenBlacklist(jti, userId, expiresAt);
-                        tokenBlacklistRepository.save(blacklistToken);
-                    }
+            if (expiresAt.isAfter(LocalDateTime.now())) {
+                // Redis에 저장
+                String redisKey = BLACKLIST_KEY_PREFIX + jti;
+                long ttlSeconds = java.time.Duration.between(LocalDateTime.now(), expiresAt).getSeconds();
+                redisTemplate.opsForValue().set(redisKey, "blocked", ttlSeconds, TimeUnit.SECONDS);
+
+                // DB에 저장 (중복 방지)
+                if (!tokenBlacklistRepository.existsById(jti)) {
+                    TokenBlacklist blacklistToken = new TokenBlacklist(jti, userId, expiresAt);
+                    tokenBlacklistRepository.save(blacklistToken);
                 }
             }
-
-        } catch (Exception e) {
-            log.debug("토큰 블랙리스트 추가 실패: userId={}, error={}", userId, e.getMessage());
         }
     }
 
-    // 토큰이 블랙리스트에 있는지 확인
-    @Transactional(readOnly = true)
     public boolean isBlacklisted(String jti) {
-        return tokenBlacklistRepository.existsByJtiAndExpiresAtAfter(jti, LocalDateTime.now());
+        // Redis 우선 확인
+        String redisKey = BLACKLIST_KEY_PREFIX + jti;
+        Boolean existsInRedis = redisTemplate.hasKey(redisKey);
+
+        if (existsInRedis) {
+            return true;
+        }
+
+        // DB 확인
+        boolean existsInDB = tokenBlacklistRepository.existsByJtiAndExpiresAtAfter(jti, LocalDateTime.now());
+
+        if (existsInDB) {
+            // Redis에 재캐싱
+            redisTemplate.opsForValue().set(redisKey, "blocked", 3600, TimeUnit.SECONDS);
+        }
+
+        return existsInDB;
     }
 
-    // 만료된 토큰들을 정리 (스케줄러)
     @Scheduled(fixedRate = 300000)
     @Transactional
     public void cleanupExpiredTokens() {
-        try {
-            LocalDateTime now = LocalDateTime.now();
-            tokenBlacklistRepository.deleteExpiredTokens(now);
-        } catch (Exception e) {
-            log.error("블랙리스트 토큰 정리 중 오류 발생", e);
-        }
+        LocalDateTime now = LocalDateTime.now();
+        tokenBlacklistRepository.deleteExpiredTokens(now);
     }
 }
