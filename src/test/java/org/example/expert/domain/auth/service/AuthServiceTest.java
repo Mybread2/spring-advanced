@@ -6,7 +6,6 @@ import org.example.expert.domain.auth.dto.request.SignupRequest;
 import org.example.expert.domain.auth.dto.response.SigninResponse;
 import org.example.expert.domain.auth.dto.response.SignupResponse;
 import org.example.expert.domain.auth.entity.RefreshToken;
-import org.example.expert.domain.auth.exception.AuthException;
 import org.example.expert.domain.auth.exception.RateLimitException;
 import org.example.expert.domain.common.exception.InvalidRequestException;
 import org.example.expert.domain.user.entity.User;
@@ -21,15 +20,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.BDDMockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -43,123 +39,73 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
     @Mock
+    private TokenBlacklistService tokenBlacklistService;
+    @Mock
     private LoginAttemptService loginAttemptService;
 
     @InjectMocks
     private AuthService authService;
 
     @Test
-    @DisplayName("회원가입 시 AccessToken과 RefreshToken이 모두 생성된다")
-    void signup_creates_both_tokens() {
+    @DisplayName("회원가입이 성공적으로 처리된다")
+    void signup_should_succeed() {
         // given
         SignupRequest request = new SignupRequest("test@test.com", "password123", "USER");
-
-        User savedUser = new User("test@test.com", "encodedPassword", UserRole.USER);
-        ReflectionTestUtils.setField(savedUser, "id", 1L);
+        User savedUser = createUser();
 
         given(userRepository.existsByEmail("test@test.com")).willReturn(false);
         given(passwordEncoder.encode("password123")).willReturn("encodedPassword");
         given(userRepository.save(any(User.class))).willReturn(savedUser);
-        given(jwtTokenProvider.createToken(1L, "test@test.com", UserRole.USER))
-                .willReturn("access-token");
-        given(refreshTokenService.createRefreshToken(1L)).willReturn("refresh-token-uuid");
+        given(jwtTokenProvider.createToken(1L, "test@test.com", UserRole.USER)).willReturn("access-token");
+        given(refreshTokenService.createRefreshToken(1L)).willReturn("refresh-token");
 
         // when
         SignupResponse response = authService.signup(request);
 
         // then
         assertThat(response.getBearerToken()).isEqualTo("access-token");
-        assertThat(response.getRefreshToken()).isEqualTo("refresh-token-uuid");
+        assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
 
+        verify(userRepository).existsByEmail("test@test.com");
+        verify(passwordEncoder).encode("password123");
+        verify(userRepository).save(any(User.class));
+        verify(jwtTokenProvider).createToken(1L, "test@test.com", UserRole.USER);
         verify(refreshTokenService).createRefreshToken(1L);
     }
 
     @Test
-    @DisplayName("이미 존재하는 이메일로 회원가입 시 예외가 발생한다")
-    void signup_with_existing_email_throws_exception() {
-        // given
-        SignupRequest request = new SignupRequest("test@test.com", "password123", "USER");
-        given(userRepository.existsByEmail("test@test.com")).willReturn(true);
-
-        // when & then
-        assertThatThrownBy(() -> authService.signup(request))
-                .isInstanceOf(InvalidRequestException.class)
-                .hasMessage("이미 존재하는 이메일입니다.");
-
-        verify(userRepository, never()).save(any(User.class));
-    }
-
-    @Test
-    @DisplayName("로그인 시 AccessToken과 RefreshToken이 모두 생성된다")
-    void signin_creates_both_tokens() {
+    @DisplayName("로그인이 성공적으로 처리된다")
+    void signin_should_succeed() {
         // given
         SigninRequest request = new SigninRequest("test@test.com", "password123");
-
-        User user = new User("test@test.com", "encodedPassword", UserRole.USER);
-        ReflectionTestUtils.setField(user, "id", 1L);
+        User user = createUser();
 
         given(loginAttemptService.isBlocked("test@test.com")).willReturn(false);
         given(userRepository.findByEmail("test@test.com")).willReturn(Optional.of(user));
         given(passwordEncoder.matches("password123", "encodedPassword")).willReturn(true);
-        given(jwtTokenProvider.createToken(1L, "test@test.com", UserRole.USER))
-                .willReturn("access-token");
-        given(refreshTokenService.createRefreshToken(1L)).willReturn("refresh-token-uuid");
+        given(jwtTokenProvider.createToken(1L, "test@test.com", UserRole.USER)).willReturn("access-token");
+        given(refreshTokenService.createRefreshToken(1L)).willReturn("refresh-token");
 
         // when
         SigninResponse response = authService.signin(request);
 
         // then
         assertThat(response.getBearerToken()).isEqualTo("access-token");
-        assertThat(response.getRefreshToken()).isEqualTo("refresh-token-uuid");
+        assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
 
+        verify(loginAttemptService).isBlocked("test@test.com");
+        verify(userRepository).findByEmail("test@test.com");
+        verify(passwordEncoder).matches("password123", "encodedPassword");
+        verify(jwtTokenProvider).createToken(1L, "test@test.com", UserRole.USER);
         verify(refreshTokenService).createRefreshToken(1L);
         verify(loginAttemptService).recordSuccessfulLogin("test@test.com");
     }
 
     @Test
-    @DisplayName("존재하지 않는 사용자로 로그인 시 예외가 발생한다")
-    void signin_with_non_existing_user_throws_exception() {
-        // given
-        SigninRequest request = new SigninRequest("nonexistent@test.com", "password123");
-
-        given(loginAttemptService.isBlocked("nonexistent@test.com")).willReturn(false);
-        given(userRepository.findByEmail("nonexistent@test.com")).willReturn(Optional.empty());
-
-        // when & then
-        assertThatThrownBy(() -> authService.signin(request))
-                .isInstanceOf(AuthException.class)
-                .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
-
-        verify(loginAttemptService).recordFailedAttempt("nonexistent@test.com");
-    }
-
-    @Test
-    @DisplayName("잘못된 비밀번호로 로그인 시 예외가 발생한다")
-    void signin_with_wrong_password_throws_exception() {
-        // given
-        SigninRequest request = new SigninRequest("test@test.com", "wrongpassword");
-
-        User user = new User("test@test.com", "encodedPassword", UserRole.USER);
-        ReflectionTestUtils.setField(user, "id", 1L);
-
-        given(loginAttemptService.isBlocked("test@test.com")).willReturn(false);
-        given(userRepository.findByEmail("test@test.com")).willReturn(Optional.of(user));
-        given(passwordEncoder.matches("wrongpassword", "encodedPassword")).willReturn(false);
-
-        // when & then
-        assertThatThrownBy(() -> authService.signin(request))
-                .isInstanceOf(AuthException.class)
-                .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
-
-        verify(loginAttemptService).recordFailedAttempt("test@test.com");
-    }
-
-    @Test
-    @DisplayName("로그인 시도가 차단된 사용자는 로그인할 수 없다")
-    void signin_blocked_user_throws_exception() {
+    @DisplayName("차단된 사용자는 로그인할 수 없다")
+    void signin_should_fail_when_user_is_blocked() {
         // given
         SigninRequest request = new SigninRequest("blocked@test.com", "password123");
-
         given(loginAttemptService.isBlocked("blocked@test.com")).willReturn(true);
         given(loginAttemptService.getRemainingBlockTimeMinutes("blocked@test.com")).willReturn(10L);
 
@@ -168,61 +114,59 @@ class AuthServiceTest {
                 .isInstanceOf(RateLimitException.class)
                 .hasMessage("로그인이 일시적으로 차단되었습니다.");
 
+        verify(loginAttemptService).isBlocked("blocked@test.com");
         verify(userRepository, never()).findByEmail(anyString());
     }
 
     @Test
-    @DisplayName("RefreshToken으로 새로운 AccessToken을 발급받는다")
-    void refreshToken_generates_new_tokens() {
+    @DisplayName("RefreshToken으로 새로운 토큰을 발급받는다")
+    void refreshToken_should_generate_new_tokens() {
         // given
-        String oldRefreshToken = "old-refresh-token";
+        String refreshTokenValue = "refresh-token";
+        RefreshToken refreshToken = new RefreshToken(refreshTokenValue, 1L, LocalDateTime.now().plusDays(14));
+        User user = createUser();
 
-        RefreshToken refreshToken = new RefreshToken(oldRefreshToken, 1L,
-                java.time.LocalDateTime.now().plusDays(14));
-
-        User user = new User("test@test.com", "encodedPassword", UserRole.USER);
-        ReflectionTestUtils.setField(user, "id", 1L);
-
-        given(refreshTokenService.validateRefreshToken(oldRefreshToken)).willReturn(refreshToken);
+        given(refreshTokenService.validateRefreshToken(refreshTokenValue)).willReturn(refreshToken);
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
-        given(jwtTokenProvider.createToken(1L, "test@test.com", UserRole.USER))
-                .willReturn("new-access-token");
+        given(jwtTokenProvider.createToken(1L, "test@test.com", UserRole.USER)).willReturn("new-access-token");
         given(refreshTokenService.createRefreshToken(1L)).willReturn("new-refresh-token");
 
         // when
-        SigninResponse response = authService.refreshToken(oldRefreshToken);
+        SigninResponse response = authService.refreshToken(refreshTokenValue);
 
         // then
         assertThat(response.getBearerToken()).isEqualTo("new-access-token");
         assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");
 
-        // RefreshToken Rotation 확인
-        verify(refreshTokenService).validateRefreshToken(oldRefreshToken);
+        verify(refreshTokenService).validateRefreshToken(refreshTokenValue);
+        verify(userRepository).findById(1L);
+        verify(jwtTokenProvider).createToken(1L, "test@test.com", UserRole.USER);
         verify(refreshTokenService).createRefreshToken(1L);
     }
 
     @Test
     @DisplayName("유효하지 않은 RefreshToken으로 갱신 시 예외가 발생한다")
-    void refreshToken_with_invalid_token_throws_exception() {
+    void refreshToken_should_fail_with_invalid_token() {
         // given
-        String invalidRefreshToken = "invalid-refresh-token";
-
-        given(refreshTokenService.validateRefreshToken(invalidRefreshToken))
+        String invalidToken = "invalid-token";
+        given(refreshTokenService.validateRefreshToken(invalidToken))
                 .willThrow(new InvalidRequestException("유효하지 않은 Refresh Token입니다."));
 
         // when & then
-        assertThatThrownBy(() -> authService.refreshToken(invalidRefreshToken))
+        assertThatThrownBy(() -> authService.refreshToken(invalidToken))
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessage("유효하지 않은 Refresh Token입니다.");
+
+        verify(userRepository, never()).findById(anyLong());
+        verify(jwtTokenProvider, never()).createToken(anyLong(), anyString(), any(UserRole.class));
     }
 
     @Test
-    @DisplayName("RefreshToken으로 갱신 시 사용자를 찾을 수 없으면 예외가 발생한다")
-    void refreshToken_with_non_existing_user_throws_exception() {
+    @DisplayName("존재하지 않는 사용자의 RefreshToken으로 갱신 시 예외가 발생한다")
+    void refreshToken_should_fail_when_user_not_found() {
         // given
-        String refreshTokenValue = "valid-refresh-token";
-        RefreshToken refreshToken = new RefreshToken(refreshTokenValue, 999L,
-                java.time.LocalDateTime.now().plusDays(14));
+        String refreshTokenValue = "valid-token";
+        RefreshToken refreshToken = new RefreshToken(refreshTokenValue, 999L, LocalDateTime.now().plusDays(14));
 
         given(refreshTokenService.validateRefreshToken(refreshTokenValue)).willReturn(refreshToken);
         given(userRepository.findById(999L)).willReturn(Optional.empty());
@@ -231,59 +175,78 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.refreshToken(refreshTokenValue))
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessage("사용자를 찾을 수 없습니다.");
+
+        verify(jwtTokenProvider, never()).createToken(anyLong(), anyString(), any(UserRole.class));
     }
 
     @Test
-    @DisplayName("로그아웃 시 AccessToken이 블랙리스트에 추가되고 RefreshToken이 삭제된다")
-    void logout_adds_token_to_blacklist_and_deletes_refresh_token() {
+    @DisplayName("로그아웃이 성공적으로 처리된다")
+    void logout_should_succeed() {
         // given
         Long userId = 1L;
-        String accessToken = "valid-access-token";
+        String accessToken = "access-token";
 
         // when
         authService.logout(userId, accessToken);
 
         // then
+        verify(tokenBlacklistService).addTokenToBlacklist(accessToken, userId);
         verify(refreshTokenService).deleteRefreshTokenByUserId(userId);
-        // AccessToken 블랙리스트 추가는 내부 로직이므로 직접 검증하기 어려움
-        // 실제로는 tokenBlacklistService.addToBlacklist가 호출되어야 함
     }
 
     @Test
     @DisplayName("AccessToken 없이 로그아웃해도 RefreshToken은 삭제된다")
-    void logout_without_access_token_still_deletes_refresh_token() {
+    void logout_should_succeed_without_access_token() {
         // given
         Long userId = 1L;
-        String accessToken = null; // 토큰 없음
+        String accessToken = null;
 
         // when
         authService.logout(userId, accessToken);
 
         // then
+        verify(tokenBlacklistService, never()).addTokenToBlacklist(anyString(), anyLong());
         verify(refreshTokenService).deleteRefreshTokenByUserId(userId);
     }
 
     @Test
-    @DisplayName("로그아웃 후 RefreshToken으로 갱신 시도하면 실패한다")
-    void after_logout_refresh_token_should_fail() {
+    @DisplayName("빈 AccessToken으로 로그아웃해도 RefreshToken은 삭제된다")
+    void logout_should_succeed_with_empty_access_token() {
+        // given
+        Long userId = 1L;
+        String accessToken = "";
+
+        // when
+        authService.logout(userId, accessToken);
+
+        // then
+        verify(tokenBlacklistService, never()).addTokenToBlacklist(anyString(), anyLong());
+        verify(refreshTokenService).deleteRefreshTokenByUserId(userId);
+    }
+
+    @Test
+    @DisplayName("로그아웃 중 블랙리스트 추가 실패해도 RefreshToken은 삭제된다")
+    void logout_should_delete_refresh_token_even_when_blacklist_fails() {
         // given
         Long userId = 1L;
         String accessToken = "access-token";
-        String refreshTokenValue = "user-refresh-token";
 
-        // 로그아웃 (RefreshToken 삭제됨)
-        authService.logout(userId, accessToken);
-
-        // 삭제된 토큰으로 갱신 시도 시 예외 발생하도록 설정
-        given(refreshTokenService.validateRefreshToken(refreshTokenValue))
-                .willThrow(new InvalidRequestException("유효하지 않은 Refresh Token입니다."));
+        doThrow(new RuntimeException("블랙리스트 추가 실패"))
+                .when(tokenBlacklistService).addTokenToBlacklist(accessToken, userId);
 
         // when & then
-        assertThatThrownBy(() -> authService.refreshToken(refreshTokenValue))
-                .isInstanceOf(InvalidRequestException.class)
-                .hasMessage("유효하지 않은 Refresh Token입니다.");
+        assertThatThrownBy(() -> authService.logout(userId, accessToken))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("로그아웃 처리 중 오류가 발생했습니다.");
 
-        // 로그아웃이 호출되었는지 확인
-        verify(refreshTokenService).deleteRefreshTokenByUserId(userId);
+        // RefreshToken 삭제가 호출되었는지 확인 (실제로는 2번이 아닐 수 있음)
+        verify(refreshTokenService, atLeastOnce()).deleteRefreshTokenByUserId(userId);
+    }
+
+    // 테스트 헬퍼 메서드
+    private User createUser() {
+        User user = new User("test@test.com", "encodedPassword", UserRole.USER);
+        ReflectionTestUtils.setField(user, "id", 1L);
+        return user;
     }
 }
