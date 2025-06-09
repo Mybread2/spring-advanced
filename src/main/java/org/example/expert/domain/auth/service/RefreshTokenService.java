@@ -18,12 +18,11 @@ public class RefreshTokenService {
 
     @Transactional
     public String createRefreshToken(Long userId) {
-        // 기존 RefreshToken이 있다면 삭제 (한 사용자당 하나만)
+
         refreshTokenRepository.deleteByUserId(userId);
 
-        // 새 RefreshToken 생성
         String token = UUID.randomUUID().toString();
-        LocalDateTime expiresAt = LocalDateTime.now().plusDays(14); // 2주
+        LocalDateTime expiresAt = LocalDateTime.now().plusDays(14);
 
         RefreshToken refreshToken = new RefreshToken(token, userId, expiresAt);
         refreshTokenRepository.save(refreshToken);

@@ -9,15 +9,11 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.jwt")
 public class JwtProperties {
 
-    // JWT 서명에 사용할 비밀키 (Base64 인코딩)
     private String secretKey;
 
-    // Access Token 만료 시간 (기본 15분)
     private Long expirationTime = 900_000L;
 
-    // JWT 발급자 정보
     private String issuer = "expert-app";
 
-    // Bearer 토큰 접두사
     private String bearerPrefix = "Bearer ";
 }

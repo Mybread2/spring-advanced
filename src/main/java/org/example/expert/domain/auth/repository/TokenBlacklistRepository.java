@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 
 public interface TokenBlacklistRepository extends JpaRepository<TokenBlacklist, String> {
 
-    // 기존 메서드들...
     boolean existsByJtiAndExpiresAtAfter(String jti, LocalDateTime now);
 
     @Modifying

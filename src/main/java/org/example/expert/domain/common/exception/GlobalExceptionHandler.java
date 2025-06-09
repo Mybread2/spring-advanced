@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
         data.put("retryAfter", ex.getRemainingTimeMinutes() * 60);
 
         ApiResponse<Map<String, Object>> response = ApiResponse.failure(ex.getMessage(), "E2006");
-        // data 필드에 추가 정보 포함
+
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
     }
 

@@ -10,8 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class LoginAttemptService {
 
-    private static final int MAX_ATTEMPTS = 5; // 최대 시도 횟수
-    private static final int BLOCK_DURATION_MINUTES = 15; // 차단 시간 (분)
+    private static final int MAX_ATTEMPTS = 5;
+    private static final int BLOCK_DURATION_MINUTES = 15;
 
     // 이메일별 시도 횟수 저장
     private final ConcurrentHashMap<String, AttemptInfo> loginAttempts = new ConcurrentHashMap<>();

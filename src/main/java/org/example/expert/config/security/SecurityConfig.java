@@ -17,7 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // @PreAuthorize 등 사용 가능
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -28,27 +28,22 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-                // CSRF 비활성화 (JWT 사용으로 불필요)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // 세션 사용 안함 (Stateless)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 경로별 접근 권한 설정
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()  // 인증 경로는 모두 허용
-                        .requestMatchers("/admin/**").hasRole("ADMIN")  // 관리자 경로는 ADMIN 권한만
-                        .anyRequest().authenticated()  // 나머지는 인증 필요
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
                 )
 
-                // 인증/인가 실패 시 처리할 핸들러 등록
                 .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)  // 401: 인증 실패
-                        .accessDeniedHandler(jwtAccessDeniedHandler)            // 403: 인가 실패
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
 
-                // JWT 필터 등록 (UsernamePasswordAuthenticationFilter 앞에)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

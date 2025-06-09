@@ -48,7 +48,7 @@ public class TokenBlacklistService {
     }
 
     public boolean isBlacklisted(String jti) {
-        // Redis 우선 확인
+
         String redisKey = BLACKLIST_KEY_PREFIX + jti;
         Boolean existsInRedis = redisTemplate.hasKey(redisKey);
 

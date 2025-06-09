@@ -28,7 +28,7 @@ public class TodoService {
     private final WeatherClient weatherClient;
     private final UserRepository userRepository;
 
-    @CacheEvict(value = "todoLists", allEntries = true) // 새로운 할일 생성 시 목록 캐시 무효화
+    @CacheEvict(value = "todoLists", allEntries = true)
     @Transactional
     public TodoSaveResponse saveTodo(Long userId, TodoSaveRequest todoSaveRequest) {
 
@@ -71,7 +71,7 @@ public class TodoService {
         ));
     }
 
-    @Cacheable(value = "todoDetails", key = "#todoId")
+    @Cacheable(value = "todoLists", key = "'detail_' + #todoId")
     public TodoResponse getTodo(long todoId) {
         Todo todo = todoRepository.findTodoById(todoId)
                 .orElseThrow(() -> new InvalidRequestException("Todo not found"));

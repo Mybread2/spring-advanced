@@ -33,7 +33,6 @@ public class JwtTokenProvider {
         key = Keys.hmacShaKeyFor(bytes);
     }
 
-    // JWT 토큰 생성 (Bearer 접두사 포함)
     public String createToken(Long userId, String email, UserRole userRole) {
         Date date = new Date();
         String jti = UUID.randomUUID().toString();
@@ -50,7 +49,6 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    // JWT 토큰 파싱 및 검증
     public Claims parseToken(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
@@ -71,7 +69,6 @@ public class JwtTokenProvider {
         }
     }
 
-    // 토큰의 만료 시간을 LocalDateTime 으로 반환
     public LocalDateTime getExpirationTime(Claims claims) {
         Date expiration = claims.getExpiration();
         return expiration.toInstant()
