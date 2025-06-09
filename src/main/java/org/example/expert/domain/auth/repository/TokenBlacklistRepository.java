@@ -13,7 +13,7 @@ public interface TokenBlacklistRepository extends JpaRepository<TokenBlacklist, 
     // JTI 로 블랙리스트된 토큰 존재 여부 확인 (만료되지 않은 것만)
     boolean existsByJtiAndExpiresAtAfter(String jti, LocalDateTime now);
 
-    // 만료된 토큰들을 배치로 삭제
+    // 만료된 토큰 삭제
     @Modifying
     @Query("DELETE FROM TokenBlacklist t WHERE t.expiresAt < :expiredTime")
     void deleteExpiredTokens(@Param("expiredTime") LocalDateTime expiredTime);

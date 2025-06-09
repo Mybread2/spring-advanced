@@ -50,7 +50,6 @@ public class SecurityConfig {
 
                 // JWT 필터 등록 (UsernamePasswordAuthenticationFilter 앞에)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-
                 .build();
     }
 

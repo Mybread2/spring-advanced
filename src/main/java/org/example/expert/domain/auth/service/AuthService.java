@@ -1,8 +1,6 @@
 package org.example.expert.domain.auth.service;
 
-import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.example.expert.config.security.JwtTokenProvider;
 import org.example.expert.domain.auth.dto.request.SigninRequest;
 import org.example.expert.domain.auth.dto.request.SignupRequest;
@@ -20,9 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
-
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -62,7 +57,7 @@ public class AuthService {
     public SigninResponse signin(SigninRequest signinRequest) {
         String email = signinRequest.getEmail();
 
-        // 1. 로그인 차단 확인 ← 추가
+        // 1. 로그인 차단 확인
         if (loginAttemptService.isBlocked(email)) {
             long remainingMinutes = loginAttemptService.getRemainingBlockTimeMinutes(email);
             throw new RateLimitException("로그인이 일시적으로 차단되었습니다.", remainingMinutes);
@@ -71,13 +66,13 @@ public class AuthService {
         // 2. 사용자 조회
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    loginAttemptService.recordFailedAttempt(email); // ← 실패 기록
+                    loginAttemptService.recordFailedAttempt(email); // 실패 기록
                     return new AuthException("이메일 또는 비밀번호가 올바르지 않습니다.");
                 });
 
         // 3. 비밀번호 검증
         if (!passwordEncoder.matches(signinRequest.getPassword(), user.getPassword())) {
-            loginAttemptService.recordFailedAttempt(email); // ← 실패 기록
+            loginAttemptService.recordFailedAttempt(email); // 실패 기록
             throw new AuthException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
 
@@ -85,7 +80,7 @@ public class AuthService {
         String accessToken = jwtTokenProvider.createToken(user.getId(), user.getEmail(), user.getUserRole());
         String refreshToken = refreshTokenService.createRefreshToken(user.getId());
 
-        // 5. 성공 시 시도 카운터 리셋 ← 추가
+        // 5. 성공 시 시도 카운터 리셋
         loginAttemptService.recordSuccessfulLogin(email);
 
         return new SigninResponse(accessToken, refreshToken);
@@ -118,40 +113,17 @@ public class AuthService {
         try {
             // 1. Access Token 블랙리스트 추가 (토큰이 있는 경우만)
             if (StringUtils.hasText(accessToken)) {
-                addAccessTokenToBlacklist(accessToken, userId);
+                tokenBlacklistService.addTokenToBlacklist(accessToken, userId);
             }
 
             // 2. Refresh Token 삭제 (항상 실행)
             refreshTokenService.deleteRefreshTokenByUserId(userId);
 
         } catch (Exception e) {
-            log.error("로그아웃 처리 중 오류 발생: userId={}", userId, e);
-
             // 실패해도 RefreshToken은 삭제 (보안상 중요)
             refreshTokenService.deleteRefreshTokenByUserId(userId);
 
             throw new RuntimeException("로그아웃 처리 중 오류가 발생했습니다.", e);
-        }
-    }
-
-    // Access Token을 블랙리스트에 추가하는 내부 메서드
-    private void addAccessTokenToBlacklist(String accessToken, Long userId) {
-        try {
-            Claims claims = jwtTokenProvider.parseToken(accessToken);
-            String jti = claims.getId();
-
-            if (StringUtils.hasText(jti)) {
-                LocalDateTime expiresAt = jwtTokenProvider.getExpirationTime(claims);
-
-                // 아직 만료되지 않은 토큰만 블랙리스트에 추가
-                if (expiresAt.isAfter(LocalDateTime.now())) {
-                    tokenBlacklistService.addToBlacklist(jti, userId, expiresAt);
-                }
-            }
-
-        } catch (Exception e) {
-            // 블랙리스트 추가 실패해도 로그아웃은 계속 진행
-            log.warn("Access Token 블랙리스트 추가 실패: userId={}", userId);
         }
     }
 }
