@@ -1,7 +1,5 @@
 # SPRING ADVANCED
 
-# TODO Expert 
-
 > **높은 보안을 갖춘 할일 관리 시스템**  
 > Spring Boot 3.x + JWT + Redis 기반의 프로덕션 레디 애플리케이션
 
