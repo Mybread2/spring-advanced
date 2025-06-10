@@ -261,7 +261,5 @@ Content-Type: application/json
 - **Query Level**: Entity Graph로 N+1 해결
 
 ### 메모리 관리
-- **Connection Pool**: HikariCP 최적화
-- **JVM Tuning**: G1GC 사용 권장
 - **Redis Memory**: TTL 기반 자동 정리
 ---
