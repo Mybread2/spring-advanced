@@ -233,6 +233,7 @@ Content-Type: application/json
 ```
 
 ## 테스트
+![image](https://github.com/user-attachments/assets/1076ff88-63b9-42af-ab65-df687601a0f3)
 
 ### 주요 테스트 케이스
 - **JWT 토큰 생성/검증**: 토큰 라이프사이클 테스트
