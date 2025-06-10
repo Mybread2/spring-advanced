@@ -1,6 +1,7 @@
 package org.example.expert.domain.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.expert.domain.auth.service.PasswordPolicyService;
 import org.example.expert.domain.auth.service.RefreshTokenService;
 import org.example.expert.domain.common.exception.InvalidRequestException;
 import org.example.expert.domain.user.dto.request.UserChangePasswordRequest;
@@ -20,6 +21,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final PasswordPolicyService passwordPolicyService;
 
     @Cacheable(value = "userProfiles", key = "#userId")
     @Transactional(readOnly = true)
@@ -30,20 +32,25 @@ public class UserService {
 
     @CacheEvict(value = "userProfiles", key = "#userId")
     @Transactional
-    public void changePassword(long userId, UserChangePasswordRequest userChangePasswordRequest) {
+    public void changePassword(long userId, UserChangePasswordRequest request) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidRequestException("User not found"));
 
-        if (!passwordEncoder.matches(userChangePasswordRequest.getOldPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new InvalidRequestException("잘못된 비밀번호입니다.");
         }
 
-        if (passwordEncoder.matches(userChangePasswordRequest.getNewPassword(), user.getPassword())) {
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
             throw new InvalidRequestException("새 비밀번호는 기존 비밀번호와 같을 수 없습니다.");
         }
 
-        user.changePassword(passwordEncoder.encode(userChangePasswordRequest.getNewPassword()));
+        passwordPolicyService.validatePasswordReuse(request.getNewPassword(), userId);
+
+        String newEncodedPassword = passwordEncoder.encode(request.getNewPassword());
+        user.changePassword(newEncodedPassword);
+
+        passwordPolicyService.savePasswordHistory(userId, newEncodedPassword);
 
         refreshTokenService.deleteRefreshTokenByUserId(userId);
     }

@@ -102,17 +102,10 @@ public class AuthService {
 
     @Transactional
     public void logout(Long userId, String accessToken) {
-        try {
-            if (StringUtils.hasText(accessToken)) {
-                tokenBlacklistService.addTokenToBlacklist(accessToken, userId);
-            }
-
-            refreshTokenService.deleteRefreshTokenByUserId(userId);
-
-        } catch (Exception e) {
-            refreshTokenService.deleteRefreshTokenByUserId(userId);
-
-            throw new RuntimeException("로그아웃 처리 중 오류가 발생했습니다.", e);
+        if (StringUtils.hasText(accessToken)) {
+            tokenBlacklistService.addTokenToBlacklist(accessToken, userId);
         }
+
+        refreshTokenService.deleteRefreshTokenByUserId(userId);
     }
 }
