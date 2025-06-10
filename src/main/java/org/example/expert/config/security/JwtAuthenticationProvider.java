@@ -37,6 +37,7 @@ public class JwtAuthenticationProvider {
 
         String jti = claims.getId();
         if (StringUtils.hasText(jti) && tokenBlacklistService.isBlacklisted(jti)) {
+            log.warn("블랙리스트된 토큰 사용 시도 - JTI: {}", jti);
             throw new BadCredentialsException("로그아웃된 토큰입니다.");
         }
 
@@ -45,20 +46,32 @@ public class JwtAuthenticationProvider {
         String roleStr = claims.get("userRole", String.class);
 
         if (!StringUtils.hasText(userIdStr) || !StringUtils.hasText(email) || !StringUtils.hasText(roleStr)) {
+            log.warn("JWT 토큰에 필수 정보 누락 - userId: {}, email: {}, role: {}",
+                    userIdStr, email, roleStr);
             throw new BadCredentialsException("JWT 토큰에 필수 정보가 누락되었습니다.");
         }
 
-        UserPrincipal userPrincipal = UserPrincipal.builder()
-                .id(Long.parseLong(userIdStr))
-                .email(email)
-                .role(UserRole.of(roleStr))
-                .build();
+        try {
+            UserPrincipal userPrincipal = UserPrincipal.builder()
+                    .id(Long.parseLong(userIdStr))
+                    .email(email)
+                    .role(UserRole.of(roleStr))
+                    .build();
 
-        return new UsernamePasswordAuthenticationToken(
-                userPrincipal,
-                null,
-                userPrincipal.getAuthorities()
-        );
+            return new UsernamePasswordAuthenticationToken(
+                    userPrincipal,
+                    null,
+                    userPrincipal.getAuthorities()
+            );
+
+        } catch (NumberFormatException e) {
+            log.warn("잘못된 사용자 ID 형식: {}", userIdStr);
+            throw new BadCredentialsException("JWT 토큰의 사용자 ID가 올바르지 않습니다.");
+
+        } catch (Exception e) {
+            log.warn("사용자 인증 정보 생성 실패: {}", e.getMessage());
+            throw new BadCredentialsException("사용자 인증 정보를 생성할 수 없습니다.");
+        }
     }
 
     public String extractTokenFromRequest(HttpServletRequest request) {

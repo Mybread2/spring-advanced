@@ -28,8 +28,8 @@ public interface PasswordHistoryRepository extends JpaRepository<PasswordHistory
         WHERE ph.userId = :userId
         AND ph.id NOT IN (
             SELECT ph2.id FROM PasswordHistory ph2
-            WHERE ph2.userId = :userId 
-            ORDER BY ph2.createdAt DESC 
+            WHERE ph2.userId = :userId
+            ORDER BY ph2.createdAt DESC
             LIMIT :keepCount
         )
         """)

@@ -34,26 +34,29 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        Map<String, Object> errorResponse = getStringObjectMap(authException);
+        Map<String, Object> errorResponse = createErrorResponse(authException);
 
         String jsonResponse = objectMapper.writeValueAsString(errorResponse);
         response.getWriter().write(jsonResponse);
     }
 
-    private static Map<String, Object> getStringObjectMap(AuthenticationException authException) {
+    private Map<String, Object> createErrorResponse(AuthenticationException authException) {
         Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("status", HttpStatus.UNAUTHORIZED.name());
-        errorResponse.put("code", HttpStatus.UNAUTHORIZED.value());
+        errorResponse.put("success", false);
+        errorResponse.put("timestamp", java.time.LocalDateTime.now());
 
-        // JWT 토큰 만료인지 확인
+        // 핵심: 토큰 만료 vs 기타 인증 오류만 구분
         if (authException instanceof CredentialsExpiredException) {
-            errorResponse.put("message", "JWT 토큰이 만료되었습니다. 다시 로그인해주세요.");
-            errorResponse.put("requiresRefresh", true); // ← 이 힌트 추가!
+            errorResponse.put("code", "JWT_EXPIRED");
+            errorResponse.put("message", "로그인 세션이 만료되었습니다.");
+            errorResponse.put("requiresRefresh", true);
+
         } else {
-            errorResponse.put("message", "인증이 필요합니다.");
-            errorResponse.put("requiresRefresh", false);
+            errorResponse.put("code", "AUTHENTICATION_FAILED");
+            errorResponse.put("message", "인증에 실패했습니다. 다시 로그인해주세요.");
+            errorResponse.put("requiresLogin", true);
         }
-        errorResponse.put("message", "인증이 필요합니다.");
+
         return errorResponse;
     }
 }
