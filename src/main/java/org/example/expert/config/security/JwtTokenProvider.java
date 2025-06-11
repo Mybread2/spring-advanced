@@ -57,22 +57,16 @@ public class JwtTokenProvider {
                     .parseClaimsJws(token)
                     .getBody();
 
-            // 발급자 검증
             if (!jwtProperties.getIssuer().equals(claims.getIssuer())) {
-                log.warn("JWT 발급자 불일치");
                 throw new BadCredentialsException("유효하지 않은 토큰입니다.");
             }
 
             return claims;
 
         } catch (ExpiredJwtException e) {
-            // 🎯 토큰 만료 - Refresh로 해결 가능
-            log.debug("JWT 토큰 만료");
             throw new CredentialsExpiredException("토큰이 만료되었습니다.");
 
         } catch (Exception e) {
-            // 🎯 기타 모든 JWT 오류 - 다시 로그인 필요
-            log.warn("JWT 토큰 오류: {}", e.getClass().getSimpleName());
             throw new BadCredentialsException("유효하지 않은 토큰입니다.");
         }
     }

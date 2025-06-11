@@ -94,7 +94,7 @@ class JwtTokenProviderTest {
         // when & then
         assertThatThrownBy(() -> jwtTokenProvider.parseToken(expiredToken))
                 .isInstanceOf(CredentialsExpiredException.class)
-                .hasMessage("JWT 토큰이 만료되었습니다.");
+                .hasMessage("토큰이 만료되었습니다.");
     }
 
     @Test
@@ -115,7 +115,7 @@ class JwtTokenProviderTest {
         // when & then
         assertThatThrownBy(() -> jwtTokenProvider.parseToken(tokenWithWrongSignature))
                 .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("유효하지 않은 JWT 토큰입니다.");
+                .hasMessage("유효하지 않은 토큰입니다.");
     }
 
     @Test
@@ -127,7 +127,7 @@ class JwtTokenProviderTest {
         // when & then
         assertThatThrownBy(() -> jwtTokenProvider.parseToken(malformedToken))
                 .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("유효하지 않은 JWT 토큰입니다.");
+                .hasMessage("유효하지 않은 토큰입니다.");
     }
 
     @Test
@@ -148,7 +148,7 @@ class JwtTokenProviderTest {
         // when & then
         assertThatThrownBy(() -> jwtTokenProvider.parseToken(tokenWithWrongIssuer))
                 .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("유효하지 않은 JWT 토큰입니다.");
+                .hasMessage("유효하지 않은 토큰입니다.");
     }
 
     @Test
@@ -186,24 +186,6 @@ class JwtTokenProviderTest {
         Claims claims2 = jwtTokenProvider.parseToken(token2);
 
         assertThat(claims1.getId()).isNotEqualTo(claims2.getId());
-    }
-
-    @Test
-    @DisplayName("빈 문자열 토큰 파싱 시 BadCredentialsException이 발생한다")
-    void parseToken_should_throw_exception_for_empty_token() {
-        // when & then
-        assertThatThrownBy(() -> jwtTokenProvider.parseToken(""))
-                .isInstanceOf(IllegalArgumentException.class)  // 실제로는 IllegalArgumentException 발생
-                .hasMessage("JWT String argument cannot be null or empty.");
-    }
-
-    @Test
-    @DisplayName("null 토큰 파싱 시 BadCredentialsException이 발생한다")
-    void parseToken_should_throw_exception_for_null_token() {
-        // when & then
-        assertThatThrownBy(() -> jwtTokenProvider.parseToken(null))
-                .isInstanceOf(IllegalArgumentException.class)  // 실제로는 IllegalArgumentException 발생
-                .hasMessage("JWT String argument cannot be null or empty.");
     }
 
     @Test

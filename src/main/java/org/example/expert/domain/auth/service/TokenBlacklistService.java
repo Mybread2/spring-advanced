@@ -56,11 +56,9 @@ public class TokenBlacklistService {
             return true;
         }
 
-        // DB 확인
         boolean existsInDB = tokenBlacklistRepository.existsByJtiAndExpiresAtAfter(jti, LocalDateTime.now());
 
         if (existsInDB) {
-            // Redis에 재캐싱
             redisTemplate.opsForValue().set(redisKey, "blocked", 3600, TimeUnit.SECONDS);
         }
 
